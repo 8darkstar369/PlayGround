@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#070b14" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23070b14'/%3E%3Cpath d='M32 6l7 19 19 7-19 7-7 19-7-19-19-7 19-7z' fill='%23e8c987'/%3E%3C/svg%3E" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="description" content="SeekerVerse — a 3D virtue adventure inside the Sentient Maze. Restore the four seals, brave the Shards, and ascend to Seeker Castle." />
+    <title>SeekerVerse — Echoes of the Sentient Maze</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game" aria-label="SeekerVerse game world"></canvas>
+
+      <div class="screen-fx vignette" aria-hidden="true"></div>
+      <div class="screen-fx grain" aria-hidden="true"></div>
+      <div id="damage-flash" aria-hidden="true"></div>
+      <div id="heal-flash" aria-hidden="true"></div>
+      <div id="shadow-veil" aria-hidden="true"></div>
+
+      <div id="ui">
+        <div id="hud" class="is-hidden">
+          <header id="topbar">
+            <div class="topbar-left">
+              <div class="brand-mini">
+                <span class="brand-rune">✦</span>
+                <span class="brand-word">SEEKERVERSE</span>
+              </div>
+              <div id="key-sockets" class="key-sockets" aria-label="Shard keys"></div>
+            </div>
+
+            <div id="compass" class="compass" aria-hidden="true">
+              <div class="compass-ring"></div>
+              <span class="cardinal n">N</span>
+              <span class="cardinal e">E</span>
+              <span class="cardinal s">S</span>
+              <span class="cardinal w">W</span>
+              <div class="compass-needle"></div>
+              <div id="compass-quest" class="compass-quest">◆</div>
+              <div id="compass-distance" class="compass-distance">—</div>
+            </div>
+
+            <div class="topbar-right">
+              <button id="btn-mute" class="icon-btn" aria-label="Toggle sound" title="Sound">
+                <svg viewBox="0 0 24 24" class="icon-sound"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+              </button>
+              <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause">
+                <svg viewBox="0 0 24 24"><path d="M7 5h3v14H7zM14 5h3v14h-3z"/></svg>
+              </button>
+            </div>
+          </header>
+
+          <div id="quest-card" class="quest-card">
+            <span class="quest-kicker">CURRENT THREAD</span>
+            <span id="quest-text" class="quest-text">Restore the four Virtue Seals</span>
+          </div>
+
+          <div id="rule-chip" class="rule-chip is-hidden">
+            <span id="rule-name"></span>
+            <span id="rule-detail"></span>
+          </div>
+
+          <div id="boss-bar" class="boss-bar is-hidden">
+            <div class="boss-meta">
+              <span id="boss-name">Guardian</span>
+              <span id="boss-rule"></span>
+            </div>
+            <div class="boss-track"><div id="boss-fill" class="boss-fill"></div></div>
+          </div>
+
+          <div id="toasts" class="toasts" aria-live="polite"></div>
+
+          <div id="reticle" class="reticle is-hidden"><span></span></div>
+
+          <div id="vitals" class="vitals">
+            <div class="virtues" id="virtues"></div>
+            <div class="bar-row">
+              <span class="bar-label">VITALITY</span>
+              <div class="bar track"><div id="health-fill" class="bar-fill health"></div><span id="health-text" class="bar-text">100</span></div>
+            </div>
+            <div class="bar-row">
+              <span class="bar-label">STAMINA</span>
+              <div class="bar track thin"><div id="stamina-fill" class="bar-fill stamina"></div></div>
+            </div>
+            <div id="special-meter" class="bar-row is-hidden">
+              <span id="special-label" class="bar-label">LIGHT</span>
+              <div class="bar track thin"><div id="special-fill" class="bar-fill special"></div></div>
+            </div>
+          </div>
+
+          <div id="prompt" class="prompt is-hidden">
+            <span id="prompt-key" class="prompt-key">E</span>
+            <span id="prompt-text">Interact</span>
+          </div>
+
+          <div id="mobile-controls" class="mobile-controls">
+            <div id="joystick" class="joystick">
+              <div class="joystick-ring"></div>
+              <div id="joystick-knob" class="joystick-knob"></div>
+            </div>
+            <div class="action-cluster">
+              <button id="btn-interact" class="action-btn interact" aria-label="Interact">
+                <svg viewBox="0 0 24 24"><path d="M12 3l1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7z"/></svg>
+                <span>TOUCH</span>
+              </button>
+              <button id="btn-dodge" class="action-btn dodge" aria-label="Dodge">
+                <svg viewBox="0 0 24 24"><path d="M13 3l-7 9h5l-1 9 8-11h-5z"/></svg>
+                <span>DODGE</span>
+              </button>
+              <button id="btn-attack" class="action-btn attack" aria-label="Attack">
+                <svg viewBox="0 0 24 24"><path d="M19 3l-8 8-2-2L3 15l3 3 6-6 2 2 8-8V3z"/></svg>
+                <span>STRIKE</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="title-screen" class="overlay title-screen">
+          <div class="title-shade"></div>
+          <div class="title-content">
+            <div class="sigil-mark" aria-hidden="true">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="50" class="sigil-ring"/>
+                <circle cx="60" cy="60" r="38" class="sigil-ring inner"/>
+                <path d="M60 12 L72 46 L106 60 L72 74 L60 108 L48 74 L14 60 L48 46 Z" class="sigil-star"/>
+                <circle cx="60" cy="60" r="5" class="sigil-core"/>
+              </svg>
+            </div>
+            <p class="title-eyebrow">A 3D VIRTUE ADVENTURE</p>
+            <h1 class="game-title"><span>SEEKER</span><span class="title-accent">VERSE</span></h1>
+            <p class="title-sub">Echoes of the Sentient Maze</p>
+            <p class="title-lore">The world shattered into Shards. The Maze is awake — and it is listening.<br/>Restore the four Virtue Seals. Brave the Shards. Ascend.</p>
+            <button id="btn-start" class="primary-btn">
+              <span class="btn-glow"></span>
+              <span class="btn-label">ENTER THE MAZE</span>
+              <span class="btn-glyph">✦</span>
+            </button>
+            <div class="title-footer">
+              <span>TOUCH &amp; KEYBOARD</span><i></i><span>HEADPHONES RECOMMENDED</span><i></i><span>CHAPTER I</span>
+            </div>
+          </div>
+          <div class="title-hint">Drag to look · Follow the compass · The Maze rewards the curious</div>
+        </div>
+
+        <div id="pause-screen" class="overlay pause-screen is-hidden">
+          <div class="panel">
+            <p class="panel-kicker">THE MAZE WAITS</p>
+            <h2>PAUSED</h2>
+            <div class="settings">
+              <div class="setting-row">
+                <span>Sound</span>
+                <button id="btn-sound-toggle" class="toggle is-on" aria-label="Toggle sound"><span></span></button>
+              </div>
+              <div class="setting-row">
+                <span>Visual quality</span>
+                <div class="segmented" id="quality-seg">
+                  <button data-quality="high" class="is-on">High</button>
+                  <button data-quality="low">Lite</button>
+                </div>
+              </div>
+            </div>
+            <button id="btn-resume" class="primary-btn small"><span class="btn-label">RESUME</span></button>
+            <button id="btn-restart" class="ghost-btn">Restart journey</button>
+            <div class="pause-controls">
+              <span><b>WASD</b> move</span><span><b>DRAG</b> look</span><span><b>J / CLICK</b> strike</span><span><b>SPACE</b> dodge</span><span><b>E</b> interact</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="ending-screen" class="overlay ending-screen is-hidden">
+          <div class="ending-rays"></div>
+          <div class="ending-content">
+            <p class="title-eyebrow">THE CASTLE REMEMBERS</p>
+            <h2 class="ending-title">SEEKER<br/><span>ASCENDED</span></h2>
+            <p id="ending-copy" class="ending-copy">The four Shards sing as one. The Maze opens its final door.</p>
+            <div id="ending-stats" class="ending-stats"></div>
+            <button id="btn-again" class="primary-btn"><span class="btn-glow"></span><span class="btn-label">WALK THE MAZE AGAIN</span></button>
+          </div>
+        </div>
+
+        <div id="transition" class="transition">
+          <div class="transition-rune">✦</div>
+          <div id="transition-title" class="transition-title">THE NEXUS</div>
+          <div id="transition-sub" class="transition-sub">The Maze shifts around you</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
