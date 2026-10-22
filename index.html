@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#110e18" />
+  <meta name="description" content="Sunset City — an original neon-soaked open world driving and exploration game built for phone, tablet and desktop." />
+  <title>Sunset City — Open World</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23111018'/%3E%3Cpath d='M14 43c8-15 16-22 24-26-2 7 0 12 5 16-10-1-18 1-23 7 8-2 14 0 19 5-9-2-16 0-20 5' fill='none' stroke='%23ffcf5c' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="game">
+    <canvas id="scene"></canvas>
+    <div class="screen-shade"></div>
+    <div class="vignette"></div>
+    <div class="grain"></div>
+
+    <div id="hud" class="hud is-hidden" aria-live="polite">
+      <div class="hud-corner hud-left">
+        <div class="radar-shell">
+          <canvas id="radar" width="220" height="220"></canvas>
+          <div class="radar-glass"></div>
+          <div class="radar-n">N</div>
+          <div class="radar-scan"></div>
+        </div>
+        <div class="vitals">
+          <div class="vital-line"><span class="vital-label">HEALTH</span><div class="vital-track"><div id="healthBar" class="vital-fill health"></div></div></div>
+          <div class="vital-line"><span class="vital-label">ARMOR</span><div class="vital-track"><div id="armorBar" class="vital-fill armor"></div></div></div>
+          <div class="token-line"><span class="token-dot"></span><span id="tokenCount">0 / 12</span><span class="token-label">SUNSET TOKENS</span></div>
+        </div>
+      </div>
+
+      <div class="hud-corner hud-right">
+        <div class="topline">
+          <div class="weather"><span class="sun-icon"></span><span id="clock">18:42</span><span class="temp">28°</span></div>
+          <button id="socialBtn" class="icon-btn" aria-label="Social hub">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v9H9l-5 4z"/></svg>
+          </button>
+          <button id="pauseBtn" class="icon-btn" aria-label="Pause game">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+          </button>
+        </div>
+        <div class="wanted" id="wanted" aria-label="Wanted level">
+          <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+        </div>
+        <div class="money" id="money">$850</div>
+        <div class="radio-pill">
+          <button id="soundBtn" class="radio-toggle" aria-label="Toggle sound">SOUND ON</button>
+          <span class="radio-track">NEON DRIVE <b>99.1</b></span>
+        </div>
+      </div>
+
+      <div class="zone-wrap"><div id="zoneName" class="zone-name">NEON MILE</div></div>
+
+      <div class="mission-panel" id="missionPanel">
+        <div class="mission-eyebrow"><span id="missionTag">FREE ROAM</span><span id="missionTimer"></span></div>
+        <div class="mission-title" id="missionTitle">Meet the fixer at El Rey Plaza</div>
+        <div class="mission-sub" id="missionSub">Follow the gold marker through the city</div>
+        <div class="mission-progress"><i></i></div>
+      </div>
+
+      <div id="prompt" class="prompt is-hidden"><span class="prompt-key">F</span><span id="promptText">Start mission</span></div>
+
+      <div id="speedo" class="speedo is-hidden">
+        <div class="speed-dial"><div class="speed-value"><b id="speedNum">0</b><span>MPH</span></div></div>
+        <div class="gear">D</div>
+      </div>
+
+      <div class="desktop-hint">
+        <span><b>WASD</b> move</span><span><b>SHIFT</b> sprint</span><span><b>E</b> vehicle</span><span><b>F</b> action</span><span><b>DRAG</b> camera</span><span><b>SPACE</b> handbrake</span>
+      </div>
+
+      <div id="touchControls" class="touch-controls">
+        <div id="joystick" class="joystick"><div class="joystick-ring"></div><div id="joystickKnob" class="joystick-knob"></div></div>
+        <div class="touch-actions">
+          <button class="touch-btn small" id="sprintBtn" aria-label="Sprint">
+            <svg viewBox="0 0 24 24"><path d="M13 4l-2 7h4l-4 9 1-7H8l5-9z"/></svg>
+          </button>
+          <button class="touch-btn mission" id="actionBtn" aria-label="Action">
+            <svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z"/></svg>
+            <span>ACT</span>
+          </button>
+          <button class="touch-btn car" id="carBtn" aria-label="Enter or exit vehicle">
+            <svg viewBox="0 0 24 24"><path d="M4 14l2-5h12l2 5M6 14h12v4H6zM8 18v2M16 18v2"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/></svg>
+            <span>CAR</span>
+          </button>
+          <button class="touch-btn small" id="brakeBtn" aria-label="Handbrake">
+            <svg viewBox="0 0 24 24"><path d="M12 4v12M7 9l5-5 5 5M6 20h12"/></svg>
+          </button>
+          <button class="touch-btn door" id="enterBtn" aria-label="Enter venue">
+            <svg viewBox="0 0 24 24"><path d="M5 3h9v18H5zM14 12h7M18 8l4 4-4 4"/></svg>
+            <span>DOOR</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="toasts" class="toasts"></div>
+      <div id="missionFlash" class="mission-flash"><span>MISSION</span><b>THE MARINA RUN</b></div>
+    </div>
+
+    <div id="socialPanel" class="social-panel is-hidden" aria-live="polite">
+      <div class="social-head">
+        <div class="social-title">
+          <span id="socialAccent" class="social-accent"></span>
+          <div class="social-title-copy">
+            <b id="socialRoomName">ROOM</b>
+            <small id="socialRoomTopic">topic</small>
+          </div>
+        </div>
+        <div class="social-meta">
+          <span id="socialPresence" class="social-presence">0 here</span>
+          <span id="socialProvider" class="social-provider">AI</span>
+          <button id="socialClose" class="icon-btn ghost" aria-label="Leave room">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="socialMembers" class="social-members"></div>
+      <div id="chatLog" class="chat-log"></div>
+      <div id="chatChips" class="chat-chips"></div>
+      <form id="chatForm" class="chat-form" autocomplete="off">
+        <input id="chatInput" type="text" maxlength="240" placeholder="Say something to the room..." />
+        <button id="chatSend" class="chat-send" type="submit">SEND</button>
+      </form>
+      <div class="social-foot">
+        <button id="boardBtn" class="social-foot-btn is-hidden">JOB BOARD</button>
+        <button id="leaveRoomBtn" class="social-foot-btn ghost">STEP OUTSIDE</button>
+      </div>
+    </div>
+
+    <div id="boardPanel" class="board-panel is-hidden">
+      <div class="board-head">
+        <div>
+          <span class="board-kicker">SUNSET CITY JOB BOARD</span>
+          <b id="boardTitle">OPEN CONTRACTS</b>
+        </div>
+        <button id="boardClose" class="icon-btn ghost" aria-label="Close job board">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="boardList" class="board-list"></div>
+      <div class="board-foot">
+        <button id="boardGenerate" class="social-foot-btn">POST A NEW JOB</button>
+        <span id="boardStatus" class="board-status"></span>
+      </div>
+    </div>
+
+    <div id="venuesPanel" class="venues-panel is-hidden">
+      <div class="venues-head">
+        <div>
+          <span class="board-kicker">SOCIAL HUB</span>
+          <b>WHERE TO GO</b>
+        </div>
+        <button id="venuesClose" class="icon-btn ghost" aria-label="Close social hub">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div id="venuesList" class="venues-list"></div>
+      <div class="venues-foot">
+        <button id="venuesBoardBtn" class="social-foot-btn">JOB BOARD</button>
+        <p class="venues-hint">Walk into a lit doorway to join the room. Talk to people on the street for a private chat.</p>
+      </div>
+    </div>
+
+    <div id="bubbleLayer" class="bubble-layer"></div>
+
+    <div id="menu" class="menu">
+      <div class="menu-panel">
+        <div class="brand"><span class="brand-mark">SC</span><span>AN ORIGINAL OPEN WORLD</span></div>
+        <div class="title-wrap">
+          <div class="kicker">WELCOME TO</div>
+          <h1 class="game-title"><span class="sunset">SUNSET</span><span class="city">CITY</span></h1>
+          <svg class="palm-deco" viewBox="0 0 240 260" aria-hidden="true">
+            <path d="M121 256c2-67 2-123-1-181 0-24 12-43 31-53-5 19-2 36 6 52-21-12-40-4-38 14 13-14 31-12 45 2-20-5-34 0-42 12 19-5 34 2 42 16-18-7-34-3-45 8 12-1 22 3 30 12-30-5-49 16-53 58-2 26-3 51-3 60" fill="currentColor"/>
+            <path d="M120 74c-14-23-35-37-59-41 11 8 18 19 20 33-13-11-30-15-45-8 20 02 37 11 49 28-16-5-31-2-43 8 25-3 45 4 62 21-19-2-33 4-42 18 18-8 36-6 53 7" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p class="tagline">Chase the last light. Take the long way home.<br/>A hand-built neon coastline with nowhere to be.</p>
+        <div class="feature-row">
+          <span>OPEN WORLD</span><span>DRIVE ANYTHING</span><span>TOUCH READY</span>
+        </div>
+        <button id="startBtn" class="start-btn">
+          <span class="start-icon"></span>
+          <span class="start-copy"><b>PLAY NOW</b><small>ENTER SUNSET CITY</small></span>
+          <span class="start-arrow">→</span>
+        </button>
+        <div class="menu-meta">
+          <div><b>144</b><span>BUILDINGS</span></div>
+          <div><b>12</b><span>TOKENS</span></div>
+          <div><b>∞</b><span>SUNDOWN</span></div>
+        </div>
+        <div class="menu-controls">WASD / SWIPE TO MOVE &nbsp;·&nbsp; DRAG TO LOOK &nbsp;·&nbsp; E TO DRIVE &nbsp;·&nbsp; F TO ACT</div>
+      </div>
+      <div class="menu-credit">SUNSET CITY / FREEROAM BUILD 1.0</div>
+    </div>
+
+    <div id="pause" class="pause is-hidden">
+      <div class="pause-card">
+        <div class="pause-kicker">PAUSED</div>
+        <h2>Take in the view.</h2>
+        <p>Sunset City keeps rolling without you.</p>
+        <button id="resumeBtn" class="resume-btn">RESUME</button>
+        <div class="pause-controls">
+          <span><b>WASD</b> move / drive</span><span><b>SHIFT</b> sprint</span><span><b>E</b> enter / exit vehicle</span><span><b>F</b> mission action</span><span><b>SPACE</b> handbrake</span><span><b>DRAG</b> orbit camera</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading">
+      <div class="loader-mark">SC</div>
+      <div class="loader-bar"><i></i></div>
+      <span>BUILDING THE COASTLINE</span>
+    </div>
+    <div id="flash" class="flash"></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
