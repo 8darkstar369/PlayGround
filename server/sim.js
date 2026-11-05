@@ -90,7 +90,31 @@ const BANK = {
   ]
 }
 
-const TOPIC_WORDS = ['crate', 'crates', 'van', 'call', 'caller', 'caller', 'midnight', 'favor', 'favour', 'score', 'cargo', 'manifest', 'package', 'job', 'money', 'town']
+const TOPIC_WORDS = ['crate', 'crates', 'van', 'call', 'caller', 'midnight', 'favor', 'favour', 'score', 'cargo', 'manifest', 'package', 'job', 'money', 'town', 'route', 'radio', 'music', 'signal', 'photo', 'pier', 'garage', 'arcade']
+
+const PERSONAL_REACTIONS = {
+  nova: ['I know a shortcut if this turns into a run.', 'I can get that across town before the lights change.'],
+  dex: ['i could probably trace that through the cafe router.', 'that has at least three suspicious packets in it.'],
+  kilo: ['That would make a fine call-in story tonight.', 'I can put a little music under that.'],
+  mags: ['If it rattles, I can fix it. If it talks, ask Ivy.', 'Seen worse come through my garage.'],
+  sable: ['A fine opening move. Now make it interesting.', 'The crowd would absolutely go wild for that.'],
+  juno: ['There is a record that sounds exactly like that.', 'I would let that thought play all the way through.'],
+  rocco: ['Now that is a story worth a second round.', 'I have hauled stranger things off those docks.'],
+  ivy: ['I will keep that in mind. Details tend to become useful.', 'Good to know. I prefer having options.'],
+  zeta: ['Wait, who else has noticed that?', 'That detail belongs in a photograph.']
+}
+
+const AMBIENT_STARTERS = {
+  Courier: ['The shortcut past the old cinema is still clear.', 'I just made the whole boulevard in four minutes.'],
+  Hacker: ['the cafe signal just hiccupped again.', 'i found a tower ping with no address attached.'],
+  'Radio DJ': ['I have a caller who only asks for songs nobody has heard.', 'The late-night frequency is unusually quiet.'],
+  Mechanic: ['Somebody has been tuning an engine by ear again.', 'The old coupe is finally running without a cough.'],
+  'Arcade Owner': ['The top score has survived another evening.', 'I heard somebody talking big about Tidal Combat.'],
+  'Record Dealer': ['There is a little crackle on this pressing that I love.', 'The shop sounds different after midnight.'],
+  'Dock Hand': ['The tide brought in a manifest with one line missing.', 'The pier crew is arguing about whose turn it is to buy.'],
+  Fixer: ['Two people asked about the same delivery tonight.', 'A quiet evening is usually a sign to pay attention.'],
+  'Rumour Dealer': ['I got a photograph with a familiar truck in the corner.', 'Everyone is looking at the pier, but nobody says why.']
+}
 
 export function detectIntent(text, persona, room) {
   const t = (text || '').toLowerCase()
@@ -124,7 +148,7 @@ export function simReply({ persona, room, text, history = [], player = 'friend',
   const intent = detectIntent(text, persona, room)
   const seed = Math.random()
   let body = pick(BANK[intent] || BANK.default, seed)
-  const topicMatch = (text || '').match(/\b(crates?|van|caller|midnight|favou?r|score|cargo|manifest|package)\b/i)
+  const topicMatch = (text || '').match(/\b(crate|crates|van|caller|call|midnight|favou?r|score|cargo|manifest|package|job|money|route|radio|music|signal|photo|pier|garage|arcade)\b/i)
   const ctx = {
     persona,
     room,
@@ -136,17 +160,19 @@ export function simReply({ persona, room, text, history = [], player = 'friend',
   const openerChance = 0.35 + (intent === 'greeting' ? 0.35 : 0)
   const opener = pick(OPENERS[persona.id] || ['Hey.'], seed + 0.13)
   const closer = pick(CLOSERS[persona.id] || ['See you around.'], seed + 0.37)
-
-  const lastUser = [...history].reverse().find((m) => m.role === 'user')
-  const remember = lastUser && history.length > 2 && Math.random() < 0.3
-    ? ` You asked me about ${fill('{topic}', ctx) === 'that' ? 'that' : fill('{topic}', ctx)} earlier — same answer.`
+  const hasRoomContext = history.some((m) => m.role === 'user' || m.role === 'assistant')
+  const reaction = PERSONAL_REACTIONS[persona.id]
+  const addReaction = reaction && ['default', 'askAbout'].includes(intent) && Math.random() < 0.7
+  const remember = hasRoomContext && history.length > 3 && Math.random() < 0.25
+    ? `I remember the earlier talk in ${room?.name || 'the room'}, too.`
     : ''
 
   const parts = []
   if (Math.random() < openerChance) parts.push(opener)
   parts.push(body)
+  if (addReaction) parts.push(pick(reaction, seed + 0.61))
   if (intel) parts.push(intel)
-  if (remember) parts.push(remember.trim())
+  if (remember) parts.push(remember)
   if (Math.random() < 0.4) parts.push(closer)
   return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
@@ -156,16 +182,23 @@ export function simAmbient({ room, personas }) {
   const a = personas[Math.floor(Math.random() * personas.length)]
   const b = personas.find((p) => p.id !== a.id)
   if (!b) return [{ personaId: a.id, text: `${a.name} is nursing a drink and watching the door.` }]
-  const lines = [
-    [`${a.name}: "You ever get the feeling the whole city is one beat behind?"`, `${b.name}: "Only on nights when it is not."`],
-    [`${a.name}: "Board is slow tonight."`, `${b.name}: "Boards are always slow. That is why you talk to people."`],
-    [`${a.name}: "Sunset hit the water all orange just now."`, `${b.name}: "Take a picture then, do not just describe it."`],
-    [`${a.name}: "Somebody left a package at the garage again."`, `${b.name}: "Somebody always leaves a package. That is the job."`]
-  ]
-  const pair = pick(lines, Math.random())
+
+  const starter = pick(AMBIENT_STARTERS[a.role] || ['The city has been strange tonight.'], Math.random())
+  const replies = {
+    nova: ['I can make a run past there and check.', 'Give me a minute; I know a way around.'],
+    dex: ['i can check the signal logs. something always leaves a trace.', 'that is either a glitch or a very committed person.'],
+    kilo: ['That sounds like a story for the midnight hour.', 'I will keep the frequency open for it.'],
+    mags: ['Bring it by the garage. I will tell you what is really going on.', 'Could be worse. Could be making that noise in my shop.'],
+    sable: ['Then let us settle it properly. Winner gets the next round.', 'A bold claim. The scoreboard is ready when you are.'],
+    juno: ['There is a record for that kind of night.', 'Funny how the small details are the ones that stay with you.'],
+    rocco: ['HA! I have heard a version of that story down at the pier.', 'Now that is the sort of thing people talk about over a drink.'],
+    ivy: ['That is useful. I will keep the detail on hand.', 'Interesting. I may know someone who can make use of that.'],
+    zeta: ['Wait, did you see it yourself or hear it from somebody?', 'That would make a good photograph. I want the whole story.']
+  }
+  const response = pick(replies[b.id] || ['Could be. What happened next?'], Math.random())
   return [
-    { personaId: a.id, text: pair[0].replace(`${a.name}: `, '') },
-    { personaId: b.id, text: pair[1].replace(`${b.name}: `, '') }
+    { personaId: a.id, text: starter },
+    { personaId: b.id, text: response }
   ]
 }
 

@@ -115,12 +115,13 @@ function preferredResponder(clientId, roomId) {
 }
 
 function historyFor(roomId, limit = 12) {
-  const room = roomState(roomId)
-  const lines = room.messages
-    .filter((m) => m.kind === 'chat')
+  return roomState(roomId).messages
+    .filter((message) => message.kind === 'chat')
     .slice(-limit)
-    .map((m) => `${m.author.name}: ${m.text}`)
-  return lines.length ? [{ role: 'user', content: `Recent conversation in ${roomById(roomId)?.name || 'the room'}:\n${lines.join('\n')}` }] : []
+    .map((message) => ({
+      role: message.author?.ai ? 'assistant' : 'user',
+      content: `${message.author?.name || 'Someone'}${message.author?.role ? ` (${message.author.role})` : ''}: ${message.text}`
+    }))
 }
 
 function buildSystemPrompt(persona, room, kind, intel = null) {
@@ -151,11 +152,9 @@ function intelFor(step) {
   return INTEL[step.topic.toLowerCase()] || null
 }
 
-async function generateReply({ persona, room, text, history, intel = null }) {
+async function generateReply({ persona, room, text, history = [], intel = null, player = 'Player' }) {
   const system = buildSystemPrompt(persona, room, 'chat', intel)
-  const messages = history.length
-    ? [{ role: 'user', content: `${history[0].content}\n\nNew message: ${text}` }]
-    : [{ role: 'user', content: text }]
+  const messages = [...history, { role: 'user', content: `${player}: ${text}` }]
   try {
     const result = await complete({
       system,
@@ -166,28 +165,54 @@ async function generateReply({ persona, room, text, history, intel = null }) {
     return { text: result.text, provider: 'zen', model: result.model }
   } catch (error) {
     return {
-      text: simReply({ persona, room, text, history, intel }),
+      text: simReply({ persona, room, text, history, player, intel }),
       provider: 'sim',
       reason: error.message
     }
   }
 }
 
+function parseAmbient(result, members) {
+  const memberIds = new Set(members.map((persona) => persona.id))
+  try {
+    const json = result.text.slice(result.text.indexOf('{'), result.text.lastIndexOf('}') + 1)
+    const payload = JSON.parse(json)
+    const lines = (Array.isArray(payload.lines) ? payload.lines : [])
+      .slice(0, 3)
+      .map((line) => ({
+        personaId: String(line.personaId || line.speaker || ''),
+        text: String(line.text || '').trim().replace(/^['"“”]+|['"“”]+$/g, '').slice(0, 240)
+      }))
+      .filter((line) => memberIds.has(line.personaId) && line.text)
+    return new Set(lines.map((line) => line.personaId)).size >= 2 ? lines : null
+  } catch {
+    return null
+  }
+}
+
 async function generateAmbient(roomId) {
   const members = membersOf(roomId)
   if (!members.length) return []
-  const lines = simAmbient({ room: roomById(roomId), personas: members })
-  const persona = members[0]
+  const fallback = simAmbient({ room: roomById(roomId), personas: members })
+  if (members.length < 2) return fallback
+
+  const cast = members.map((persona) => `${persona.id}: ${persona.name} (${persona.role}; ${persona.voice})`).join('\n')
+  const history = historyFor(roomId, 6)
   try {
     const result = await complete({
-      system: `Write ONE short line of small talk from ${persona.name} (${persona.role}) inside ${roomById(roomId).name}. 1 sentence, no quotes, no markdown.`,
-      messages: [{ role: 'user', content: 'Say something casual to the room.' }],
-      maxTokens: 90,
-      temperature: 1.1
+      system: [
+        `Write a natural, brief NPC-to-NPC exchange inside ${roomById(roomId).name}.`,
+        `Only these characters may speak; use their exact IDs:\n${cast}`,
+        'Return JSON only: {"lines":[{"personaId":"id","text":"one short spoken line"},{"personaId":"id","text":"one short reply"}]}.',
+        'Make exactly two connected lines from two different characters. Keep each in their own voice; no narration, quotation marks, markdown, or player-directed dialogue.'
+      ].join('\n'),
+      messages: [...history, { role: 'user', content: 'Start a fresh casual exchange that fits the room and does not repeat the recent conversation.' }],
+      maxTokens: 140,
+      temperature: 1.0
     })
-    return [{ personaId: persona.id, text: result.text }]
+    return parseAmbient(result, members) || fallback
   } catch {
-    return lines
+    return fallback
   }
 }
 
@@ -324,18 +349,18 @@ async function handleChat({ clientId, roomId, text, target }) {
   const persona = target ? personaById(target) : preferredResponder(clientId, roomId) || pickResponder(roomId)
   if (!persona) throw new Error('no responder')
 
+  const history = historyFor(roomId)
   pushMessage(roomId, {
     kind: 'chat',
     text,
     author: { id: 'player', name: player?.name || 'Player', role: 'Human', color: '#7bd4ff', ai: false }
   })
 
-  const history = historyFor(roomId)
   const isAsk = Boolean(step && step.persona === persona.id && step.type === 'ask')
   const topicHit = isAsk && (!step.topic || text.toLowerCase().includes(step.topic.toLowerCase()))
   const nameHit = isAsk && text.toLowerCase().includes(persona.name.split(' ')[0].toLowerCase())
   const intel = isAsk && (topicHit || nameHit) ? intelFor(step) : null
-  const reply = await generateReply({ persona, room, text, history, intel })
+  const reply = await generateReply({ persona, room, text, history, intel, player: player?.name || 'Player' })
   if (isAsk) {
     if (topicHit || nameHit) {
       advanceMission(clientId, activeMission(clientId), `${persona.name} answered`)
