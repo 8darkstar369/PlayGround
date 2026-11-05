@@ -198,7 +198,8 @@ export function createCharacter({ skin = 0xb97852, shirt = 0xf4f0df, pants = 0x1
     legs.push(hip)
   }
 
-  group.userData.parts = { hips, torso, head, arms, legs }
+  group.userData.parts = { hips, torso, head, arms, legs, jacket, hair: hairMesh }
+  group.userData.materials = { skin: skinMat, shirt: shirtMat, pants: pantsMat, shoes: shoeMat, hair: hairMat, accent: jacket.material }
   group.userData.phase = Math.random() * Math.PI * 2
   addContactShadow(group, 0.48, 0.42, 0.2)
   return group

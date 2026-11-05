@@ -81,7 +81,11 @@ const ui = {
   carBtn: document.querySelector('#carBtn'),
   actionBtn: document.querySelector('#actionBtn'),
   enterBtn: document.querySelector('#enterBtn'),
-  socialBtn: document.querySelector('#socialBtn')
+  socialBtn: document.querySelector('#socialBtn'),
+  servicePanel: document.querySelector('#servicePanel'),
+  serviceTitle: document.querySelector('#serviceTitle'),
+  serviceContent: document.querySelector('#serviceContent'),
+  serviceClose: document.querySelector('#serviceClose')
 }
 
 const state = {
@@ -94,6 +98,8 @@ const state = {
   money: 850,
   wanted: 0,
   tokens: 0,
+  services: { mintLevel: 0, coins: 0, coinProgress: 0, businesses: [], incomeRemainder: 0, ownedOutfits: ['sunset'], outfit: 'sunset' },
+  serviceOpen: false,
   mission: { stage: 'idle', timer: 0, cooldown: 0 },
   social: { open: false, mission: null, waypoint: null, companions: [], reported: -1, paid: null },
   camYaw: 0,
@@ -241,6 +247,144 @@ function nearestVenue() {
     }
   }
   return best
+}
+
+function nearestService() {
+  if (state.inCar) return null
+  let best = null
+  let bestDist = 4.8
+  for (const service of world.services) {
+    const d = Math.hypot(player.position.x - service.position.x, player.position.z - service.position.z)
+    if (d < bestDist) {
+      bestDist = d
+      best = service
+    }
+  }
+  return best
+}
+
+const businessCatalog = [
+  { id: 'coffee', name: 'Boardwalk Coffee Cart', detail: 'A tiny caffeine empire by the beach.', cost: 450, income: 2 },
+  { id: 'records', name: 'Neon Records', detail: 'Rare vinyl, loyal regulars, steady sales.', cost: 900, income: 5 },
+  { id: 'arcade', name: 'Vice City Arcade', detail: 'The neighborhood high-score destination.', cost: 1800, income: 11 }
+]
+
+const outfitCatalog = [
+  { id: 'sunset', name: 'Sunset Original', detail: 'Your everyday city look.', cost: 0, shirt: 0xf2eddc, pants: 0x222c40, shoes: 0xece6d8, accent: 0xffc54a },
+  { id: 'boardwalk', name: 'Boardwalk Breeze', detail: 'Teal layers with easy coastal denim.', cost: 12, shirt: 0x62d8c8, pants: 0x263e58, shoes: 0xf3e7d0, accent: 0x197e83 },
+  { id: 'neon', name: 'Neon After Dark', detail: 'A punchy pink jacket for late nights.', cost: 24, shirt: 0x242536, pants: 0x171923, shoes: 0xfff0fb, accent: 0xff3f8e },
+  { id: 'gold', name: 'Golden Hour', detail: 'Warm tones, made for the last light.', cost: 40, shirt: 0xd98954, pants: 0x59423d, shoes: 0xffd98a, accent: 0xffa52f }
+]
+
+function openService(service) {
+  if (!service) return
+  state.serviceOpen = true
+  state.services.active = service.id
+  ui.serviceTitle.textContent = service.name
+  ui.servicePanel.classList.remove('is-hidden')
+  document.body.classList.add('service-open')
+  renderService()
+}
+
+function closeService() {
+  state.serviceOpen = false
+  state.services.active = null
+  ui.servicePanel.classList.add('is-hidden')
+  document.body.classList.remove('service-open')
+  input.keys.clear()
+  input.joy.x = 0
+  input.joy.y = 0
+}
+
+function renderService() {
+  const id = state.services.active
+  const balance = `<div class="service-balance"><span>YOUR WALLET</span><b id="serviceBalance">${state.services.coins} <small>COINS</small> · ${formatMoney(state.money)}</b></div>`
+  if (id === 'mint') {
+    const maxed = state.services.mintLevel >= 5
+    const cost = 220 + state.services.mintLevel * 280
+    const rate = (state.services.mintLevel * 0.08).toFixed(2)
+    ui.serviceContent.innerHTML = `${balance}<div class="service-intro"><span class="service-icon mint-icon">✦</span><div><h3>Turn time into tokens.</h3><p>Your mint makes spendable city coins while you explore. Every upgrade increases production.</p></div></div><div class="service-card"><div><b>Mint level ${state.services.mintLevel} / 5</b><p>${rate} coins per second · ${state.services.mintLevel ? 'production is running' : 'no production yet'}</p></div><button class="service-action" data-service-action="mint-upgrade" ${maxed || state.money < cost ? 'disabled' : ''}>${maxed ? 'MAX LEVEL' : `UPGRADE · ${formatMoney(cost)}`}</button></div><p class="service-note">Coins accumulate automatically while you play and can be spent at the Style Studio.</p>`
+  } else if (id === 'business') {
+    const owned = state.services.businesses
+    const cards = businessCatalog.map(item => {
+      const purchased = owned.includes(item.id)
+      return `<div class="service-card"><div><b>${item.name}</b><p>${item.detail}<br>Earns ${formatMoney(item.income)} / sec</p></div><button class="service-action" data-service-action="business-buy" data-id="${item.id}" ${purchased || state.money < item.cost ? 'disabled' : ''}>${purchased ? 'OWNED' : `START · ${formatMoney(item.cost)}`}</button></div>`
+    }).join('')
+    ui.serviceContent.innerHTML = `${balance}<div class="service-intro"><span class="service-icon biz-icon">↗</span><div><h3>Make the city work for you.</h3><p>Buy a local business once, then collect its passive income as you roam.</p></div></div>${cards}`
+  } else if (id === 'style') {
+    const cards = outfitCatalog.map(item => {
+      const owned = state.services.ownedOutfits.includes(item.id)
+      const wearing = state.services.outfit === item.id
+      return `<div class="service-card outfit-card"><div><b>${item.name}</b><p>${item.detail}</p></div><button class="service-action" data-service-action="outfit-${owned ? 'wear' : 'buy'}" data-id="${item.id}" ${wearing || (!owned && state.services.coins < item.cost) ? 'disabled' : ''}>${wearing ? 'WEARING' : owned ? 'WEAR' : `BUY · ${item.cost} COINS`}</button></div>`
+    }).join('')
+    ui.serviceContent.innerHTML = `${balance}<div class="service-intro"><span class="service-icon style-icon">✦</span><div><h3>Dress for your next chapter.</h3><p>Unlock outfits with mint coins and wear them instantly.</p></div></div>${cards}`
+  }
+}
+
+function applyOutfit(outfit) {
+  const materials = player.userData.materials
+  for (const key of ['shirt', 'pants', 'shoes', 'accent']) materials[key].color.setHex(outfit[key])
+  state.services.outfit = outfit.id
+}
+
+function handleServiceAction(button) {
+  if (!state.serviceOpen || state.paused) return
+  const action = button.dataset.serviceAction
+  const id = button.dataset.id
+  if (action === 'mint-upgrade') {
+    const cost = 220 + state.services.mintLevel * 280
+    if (state.services.mintLevel >= 5 || state.money < cost) return
+    state.money -= cost
+    state.services.mintLevel += 1
+    updateMoney()
+    toast(`<b>Mint upgraded</b> — level ${state.services.mintLevel} production is online`, 'cyan')
+  } else if (action === 'business-buy') {
+    const item = businessCatalog.find(entry => entry.id === id)
+    if (!item || state.services.businesses.includes(id) || state.money < item.cost) return
+    state.money -= item.cost
+    state.services.businesses.push(id)
+    updateMoney()
+    toast(`<b>${item.name} opened</b> — earning ${formatMoney(item.income)} each second`, 'gold')
+  } else if (action === 'outfit-buy' || action === 'outfit-wear') {
+    const outfit = outfitCatalog.find(entry => entry.id === id)
+    if (!outfit) return
+    if (action === 'outfit-buy') {
+      if (state.services.coins < outfit.cost || state.services.ownedOutfits.includes(id)) return
+      state.services.coins -= outfit.cost
+      state.services.ownedOutfits.push(id)
+    } else if (!state.services.ownedOutfits.includes(id)) return
+    applyOutfit(outfit)
+    toast(`<b>${outfit.name}</b> equipped`, 'pink')
+  }
+  renderService()
+}
+
+function updateServiceEconomy(dt) {
+  const services = state.services
+  let changed = false
+  if (services.mintLevel > 0) {
+    services.coinProgress += dt * services.mintLevel * 0.08
+    const minted = Math.floor(services.coinProgress)
+    if (minted > 0) {
+      services.coins += minted
+      services.coinProgress -= minted
+      changed = true
+    }
+  }
+  let income = 0
+  for (const id of services.businesses) {
+    const business = businessCatalog.find(item => item.id === id)
+    if (business) income += business.income * dt
+  }
+  services.incomeRemainder += income
+  const payout = Math.floor(services.incomeRemainder)
+  if (payout > 0) {
+    state.money += payout
+    services.incomeRemainder -= payout
+    updateMoney()
+    changed = true
+  }
+  if (changed && state.serviceOpen) renderService()
 }
 
 function nearestNpc() {
@@ -614,6 +758,11 @@ document.addEventListener('pointerdown', () => {
 }, { once: true })
 
 ui.startBtn.addEventListener('click', startGame)
+ui.serviceClose.addEventListener('click', closeService)
+ui.serviceContent.addEventListener('click', e => {
+  const button = e.target.closest('[data-service-action]')
+  if (button && !button.disabled) handleServiceAction(button)
+})
 ui.pauseBtn.addEventListener('click', e => { e.stopPropagation(); togglePause(true) })
 ui.resumeBtn.addEventListener('click', () => togglePause(false))
 ui.soundBtn.addEventListener('click', e => {
@@ -626,17 +775,21 @@ ui.soundBtn.addEventListener('click', e => {
 window.addEventListener('keydown', e => {
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault()
   if (e.code === 'Escape') {
+    if (state.serviceOpen) { closeService(); return }
     if (hub.handleEscape()) return
     togglePause()
     return
   }
+  if (state.serviceOpen) return
   if (e.repeat) return
   input.keys.add(e.code)
   if (e.code === 'KeyE') {
     if (state.inCar) toggleVehicle()
     else {
+      const service = nearestService()
       const venue = nearestVenue()
-      if (venue) enterVenue(venue)
+      if (service) openService(service)
+      else if (venue) enterVenue(venue)
       else toggleVehicle()
     }
   }
@@ -681,6 +834,7 @@ canvas.addEventListener('wheel', e => {
 }, { passive: true })
 
 function updateJoystick(e) {
+  if (state.serviceOpen) return
   const rect = ui.joystick.getBoundingClientRect()
   const cx = rect.left + rect.width / 2
   const cy = rect.top + rect.height / 2
@@ -723,10 +877,11 @@ function holdButton(button, key) {
 }
 holdButton(ui.sprintBtn, 'sprint')
 holdButton(ui.brakeBtn, 'brake')
-ui.carBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); toggleVehicle() })
+ui.carBtn.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (!state.serviceOpen) toggleVehicle() })
 ui.actionBtn.addEventListener('pointerdown', e => {
   e.preventDefault()
   e.stopPropagation()
+  if (state.serviceOpen) return
   const npc = nearestNpc()
   if (npc) talkTo(npc)
   else missionAction()
@@ -734,8 +889,11 @@ ui.actionBtn.addEventListener('pointerdown', e => {
 ui.enterBtn.addEventListener('pointerdown', e => {
   e.preventDefault()
   e.stopPropagation()
+  if (state.serviceOpen) return
+  const service = nearestService()
   const venue = nearestVenue()
-  if (venue) enterVenue(venue)
+  if (service) openService(service)
+  else if (venue) enterVenue(venue)
 })
 ui.socialBtn.addEventListener('click', e => {
   e.stopPropagation()
@@ -998,39 +1156,41 @@ function updateHud(dt) {
 
 let promptCache = ''
 function updatePrompt() {
-  if (!state.started || state.paused || state.social.open) {
+  if (!state.started || state.paused || state.social.open || state.serviceOpen) {
     ui.prompt.classList.add('is-hidden')
     ui.enterBtn.classList.add('is-hidden')
     return
   }
   let key = ''
   let text = ''
-  const venue = state.inCar ? null : nearestVenue()
+  const service = state.inCar ? null : nearestService()
+  const venue = state.inCar || service ? null : nearestVenue()
   if (state.inCar) {
     key = 'E'
     text = 'EXIT VEHICLE'
+  } else if (service) {
+    key = 'E'
+    text = `OPEN ${service.name}`
+  } else if (venue) {
+    key = 'E'
+    text = `ENTER ${venue.name}`
   } else {
-    if (venue) {
-      key = 'E'
-      text = `ENTER ${venue.name}`
+    const npc = nearestNpc()
+    if (npc) {
+      key = 'F'
+      text = `TALK TO ${npc.name.toUpperCase()}`
     } else {
-      const npc = nearestNpc()
-      if (npc) {
+      const nearCar = nearestEnterableCar()
+      if (state.mission.stage === 'idle' && player.position.distanceTo(world.missionStart) < 5.4) {
         key = 'F'
-        text = `TALK TO ${npc.name.toUpperCase()}`
-      } else {
-        const nearCar = nearestEnterableCar()
-        if (state.mission.stage === 'idle' && player.position.distanceTo(world.missionStart) < 5.4) {
-          key = 'F'
-          text = 'START MISSION'
-        } else if (nearCar) {
-          key = 'E'
-          text = 'ENTER VEHICLE'
-        }
+        text = 'START MISSION'
+      } else if (nearCar) {
+        key = 'E'
+        text = 'ENTER VEHICLE'
       }
     }
   }
-  ui.enterBtn.classList.toggle('is-hidden', !venue)
+  ui.enterBtn.classList.toggle('is-hidden', !service && !venue)
   const id = key + text
   if (id !== promptCache) {
     promptCache = id
@@ -1085,16 +1245,23 @@ function frame(now) {
 
   if (!state.paused) {
     if (state.started) {
-      const axis = state.social.open ? { x: 0, y: 0 } : axisValue()
-      if (state.inCar) updateVehicle(dt, axis)
-      else updatePlayer(dt, axis)
-      updateCompanions(dt)
+      updateServiceEconomy(dt)
+      const gameplayPaused = state.social.open || state.serviceOpen
+      const axis = gameplayPaused ? { x: 0, y: 0 } : axisValue()
+      if (!gameplayPaused) {
+        if (state.inCar) updateVehicle(dt, axis)
+        else updatePlayer(dt, axis)
+        updateCompanions(dt)
+        if (state.deathCooldown > 0) state.deathCooldown -= dt
+        checkMissionWorld()
+        checkCollectibles()
+        updateHud(dt)
+        reportSocialProgress()
+      } else if (state.serviceOpen && !state.inCar) {
+        // Keep the avatar animated without advancing movement or gameplay systems.
+        animateCharacter(player, dt, 0, state.time)
+      }
       updateGameCamera(dt)
-      if (state.deathCooldown > 0) state.deathCooldown -= dt
-      checkMissionWorld()
-      checkCollectibles()
-      updateHud(dt)
-      reportSocialProgress()
     } else {
       updateMenuCamera(state.time)
     }

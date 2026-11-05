@@ -89,6 +89,7 @@ export function buildWorld(scene) {
     zones: [],
     venues: [],
     npcs: [],
+    services: [],
     time: 0
   }
 
@@ -646,6 +647,7 @@ function addStartPlaza(scene, world, cx, cz) {
   addPalmAt(scene, world, cx - 12, cz - 8, 8.4, 0.18)
   addPalmAt(scene, world, cx - 13, cz + 11, 7.2, -0.2)
   addBench(scene, cx - 8, cz + 6, 0)
+  addServiceKiosks(scene, world, cx, cz)
 
   const marker = createMissionMarker()
   marker.position.set(cx - 17, 0.06, cz - 10)
@@ -660,6 +662,36 @@ function addStartPlaza(scene, world, cx, cz) {
   addParkedCar(world, 55, 70, Math.PI, 0xe6b745, 'taxi')
   addLampAt(scene, world, cx - 21, cz - 21, 0)
   addLampAt(scene, world, cx + 21, cz + 21, Math.PI)
+}
+
+function addServiceKiosks(scene, world, cx, cz) {
+  const services = [
+    { id: 'mint', name: 'SUNSET MINT', label: 'MINT', color: 0x5ff5df, x: cx - 11, z: cz - 11 },
+    { id: 'business', name: 'START A BUSINESS', label: 'BIZ', color: 0xffc54a, x: cx - 3, z: cz - 11 },
+    { id: 'style', name: 'STYLE STUDIO', label: 'STYLE', color: 0xff5d9e, x: cx + 5, z: cz - 11 }
+  ]
+  for (const service of services) {
+    const group = new THREE.Group()
+    group.position.set(service.x, 0, service.z)
+    const dark = new THREE.MeshStandardMaterial({ color: 0x171b23, roughness: 0.62, metalness: 0.28 })
+    const trim = new THREE.MeshStandardMaterial({ color: service.color, emissive: service.color, emissiveIntensity: 1.4, roughness: 0.4 })
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.55, 1.15), dark)
+    body.position.y = 0.78
+    body.castShadow = true
+    group.add(body)
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(2.35, 0.12, 1.25), trim)
+    counter.position.y = 1.55
+    group.add(counter)
+    const sign = makeTextSprite(service.label, `#${service.color.toString(16).padStart(6, '0')}`)
+    sign.scale.set(3.2, 0.8, 1)
+    sign.position.set(0, 2.45, 0)
+    group.add(sign)
+    const screen = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 0.62), new THREE.MeshBasicMaterial({ color: service.color, transparent: true, opacity: 0.78, toneMapped: false }))
+    screen.position.set(0, 0.98, 0.59)
+    group.add(screen)
+    scene.add(group)
+    world.services.push({ ...service, position: new THREE.Vector3(service.x, 0, service.z), object: group })
+  }
 }
 
 function addCityBlock(scene, world, cx, cz) {
